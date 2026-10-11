@@ -1,0 +1,7 @@
+# Example only. infra/bootstrap/bootstrap.sh writes the real infra/backend.hcl
+# for your own AWS account (it is gitignored, because each copy of the repo
+# uses its own state bucket).
+bucket       = "secom-pipeline-tfstate-123456789012"
+region       = "eu-west-1"
+encrypt      = true
+use_lockfile = true

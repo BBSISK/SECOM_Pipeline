@@ -16,7 +16,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 
 | Component | Status |
 |---|---|
-| Repo, branch and pull-request workflow | In progress (Sprint 1) |
+| Repo, branch and pull-request workflow (protected `main`) | Built (Sprint 1) |
 | Terraform with remote state in S3 (native locking) | In progress (Sprint 1) |
 | Keyless CI authentication (GitHub OIDC → IAM) | Planned (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Planned (Sprint 1) |
@@ -34,6 +34,31 @@ Replay producer (ECS Fargate) → Kinesis Data Streams → processor (Lambda, co
 
 - **Terraform** for all infrastructure, with state in a versioned, encrypted, private S3 bucket and S3 native locking from the first apply. See [docs/bootstrap.md](docs/bootstrap.md).
 - Two stacks: a long-lived **bootstrap** stack, and a **runtime** stack that is created for demos and destroyed afterwards to keep costs low.
+
+## Set-up
+
+### What is in place
+
+- **GitHub repo with a protected `main` branch.** A branch ruleset (`protect-main`) applies to everyone, including the owner. Nobody can push straight to `main`, force-push over its history, or delete it. Every change arrives through a pull request.
+- **One branch and pull request per Jira story**, merged with squash merge only, so each story becomes one commit on `main`. Merged branches are deleted automatically.
+- **CI checks required before merge** are added in SECOM-13. Once they are, a pull request can't merge until the tests and Terraform checks pass.
+- **Terraform state in S3** from the first apply: a versioned, encrypted, private bucket with S3 native locking. See [docs/bootstrap.md](docs/bootstrap.md).
+
+### Run it on your own copy
+
+You need Terraform 1.11 or later, AWS CLI v2, and an AWS account where you can sign in with an admin profile.
+
+```bash
+git clone https://github.com/BBSISK/SECOM_Pipeline.git
+cd SECOM_Pipeline
+export AWS_PROFILE=<your-admin-profile>
+./infra/bootstrap/bootstrap.sh
+cd infra/runtime
+terraform init -backend-config=../backend.hcl
+terraform plan
+```
+
+`bootstrap.sh` creates a state bucket named after your own AWS account ID and writes `infra/backend.hcl` for you, so nothing in the code needs editing. It shows the plan and asks before creating anything.
 
 ## Way of working
 
