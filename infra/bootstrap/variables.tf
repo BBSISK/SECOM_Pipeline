@@ -15,3 +15,15 @@ variable "noncurrent_state_retention_days" {
   type        = number
   default     = 90
 }
+
+variable "github_owner" {
+  description = "GitHub user or organisation that owns the repo (case-sensitive, as GitHub shows it)."
+  type        = string
+  default     = "BBSISK"
+}
+
+variable "github_repo" {
+  description = "GitHub repository name (case-sensitive, as GitHub shows it)."
+  type        = string
+  default     = "SECOM_Pipeline"
+}
