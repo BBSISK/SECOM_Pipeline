@@ -1,0 +1,284 @@
+"""Download the SECOM dataset and write its data-quality profile (SECOM-14).
+
+Run from the repo root:
+
+    python3 scripts/profile_secom.py
+
+It downloads the dataset from the UCI Machine Learning Repository into
+data/raw/ (gitignored, never committed), then writes:
+
+    docs/data-profile.md          the numbers, in tables
+    docs/data-profile/*.png       three charts used by the README
+
+Use --data-dir to point at files you already have instead of downloading.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import sys
+import urllib.request
+import zipfile
+from datetime import date
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+
+from secom.profile import (  # noqa: E402
+    class_balance,
+    constant_sensors,
+    missing_summary,
+    monitorable_sensors,
+    near_constant_sensors,
+    read_labels,
+    read_sensors,
+    time_summary,
+    weekly_fail_rate,
+)
+
+UCI_PAGE = "https://archive.ics.uci.edu/dataset/179/secom"
+UCI_ZIP = "https://archive.ics.uci.edu/static/public/179/secom.zip"
+FILES = ("secom.data", "secom_labels.data")
+
+INK = "#1f2937"
+MUTED = "#6b7280"
+BLUE = "#2563eb"
+RED = "#dc2626"
+
+
+def find_members(archive: zipfile.ZipFile) -> dict[str, bytes]:
+    """Return the two SECOM files from the zip, looking inside a nested zip if there is one."""
+    found: dict[str, bytes] = {}
+    for name in archive.namelist():
+        base = Path(name).name
+        if base in FILES:
+            found[base] = archive.read(name)
+        elif base.endswith(".zip"):
+            found.update(find_members(zipfile.ZipFile(io.BytesIO(archive.read(name)))))
+    return found
+
+
+def download(raw_dir: Path) -> None:
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    if all((raw_dir / f).exists() for f in FILES):
+        print(f"Using files already in {raw_dir}")
+        return
+    print(f"Downloading {UCI_ZIP}")
+    with urllib.request.urlopen(UCI_ZIP, timeout=60) as response:
+        payload = response.read()
+    members = find_members(zipfile.ZipFile(io.BytesIO(payload)))
+    missing = [f for f in FILES if f not in members]
+    if missing:
+        raise SystemExit(f"The download did not contain {missing}. Get the files from {UCI_PAGE}")
+    for name, data in members.items():
+        (raw_dir / name).write_bytes(data)
+    print(f"Saved {', '.join(FILES)} to {raw_dir}")
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def style(ax) -> None:
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(colors=MUTED)
+    ax.yaxis.label.set_color(INK)
+    ax.xaxis.label.set_color(INK)
+
+
+def chart_missing_per_sensor(sensors, out: Path) -> None:
+    share = sensors.isna().mean() * 100
+    fig, ax = plt.subplots(figsize=(8, 3.6), dpi=150)
+    ax.hist(share, bins=50, color=BLUE)
+    ax.set_xlabel("Readings missing for a sensor (%)")
+    ax.set_ylabel("Number of sensors")
+    ax.set_title("Most sensors are nearly complete; a few are mostly empty", loc="left", color=INK)
+    style(ax)
+    fig.tight_layout()
+    fig.savefig(out)
+    plt.close(fig)
+
+
+def chart_missing_map(sensors, out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+    ax.imshow(sensors.isna().to_numpy(), aspect="auto", interpolation="nearest", cmap="Greys")
+    ax.set_xlabel("Sensor (column)")
+    ax.set_ylabel("Production run (file order)")
+    ax.set_title("Where values are missing (dark = missing)", loc="left", color=INK)
+    style(ax)
+    fig.tight_layout()
+    fig.savefig(out)
+    plt.close(fig)
+
+
+def chart_weekly(weekly, out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(8, 3.6), dpi=150)
+    ax.bar(weekly.index, weekly["runs"], width=5, color=BLUE, alpha=0.35, label="Runs per week")
+    ax.set_ylabel("Runs per week")
+    style(ax)
+    ax2 = ax.twinx()
+    ax2.plot(weekly.index, weekly["fail_rate"] * 100, color=RED, marker="o", linewidth=1.5, label="Fail rate")
+    ax2.set_ylabel("Fail rate (%)", color=RED)
+    ax2.set_ylim(bottom=0)
+    ax2.tick_params(colors=MUTED)
+    ax2.spines["top"].set_visible(False)
+    ax.set_title("Runs and fail rate by week", loc="left", color=INK)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(out)
+    plt.close(fig)
+
+
+def pct(x: float) -> str:
+    return f"{x * 100:.1f}%"
+
+
+def write_report(sensors, labels, raw_dir: Path, out_md: Path, chart_dir: Path) -> None:
+    ms = missing_summary(sensors)
+    const = constant_sensors(sensors)
+    near = near_constant_sensors(sensors)
+    balance = class_balance(labels)
+    times = time_summary(labels)
+    monitorable_50 = monitorable_sensors(sensors, 0.5)
+    monitorable_20 = monitorable_sensors(sensors, 0.2)
+    complete_runs = len(sensors) - ms.runs_with_any_missing
+    rel = chart_dir.relative_to(out_md.parent)
+
+    lines = [
+        "# SECOM data profile",
+        "",
+        f"Generated by `scripts/profile_secom.py` on {date.today().isoformat()}. "
+        "Re-run it to regenerate this page and the charts.",
+        "",
+        f"Source: [UCI Machine Learning Repository, SECOM]({UCI_PAGE}). Files checked by SHA-256:",
+        "",
+        "| File | SHA-256 |",
+        "|---|---|",
+    ]
+    lines += [f"| `{f}` | `{sha256(raw_dir / f)}` |" for f in FILES]
+    lines += [
+        "",
+        "## Shape",
+        "",
+        "| Measure | Value |",
+        "|---|---|",
+        f"| Production runs (rows) | {len(sensors):,} |",
+        f"| Sensor measurements per run (columns) | {sensors.shape[1]} |",
+        f"| Labels rows | {len(labels):,} |",
+        f"| Rows match between the two files | {'yes' if len(sensors) == len(labels) else 'NO'} |",
+        "",
+        "## Class balance",
+        "",
+        "| Outcome | Runs | Share |",
+        "|---|---|---|",
+        f"| Pass (label -1) | {balance.passes:,} | {pct(balance.passes / balance.total)} |",
+        f"| Fail (label 1) | {balance.fails:,} | {pct(balance.fail_rate)} |",
+        "",
+        f"About **{balance.ratio:.1f} passes for every fail**.",
+        "",
+        "## Missing values",
+        "",
+        "| Measure | Value |",
+        "|---|---|",
+        f"| Cells missing | {ms.cells_missing:,} of {ms.cells_total:,} ({pct(ms.missing_share)}) |",
+        f"| Runs with at least one missing value | {ms.runs_with_any_missing:,} "
+        f"of {len(sensors):,} ({pct(ms.runs_with_any_missing / len(sensors))}) |",
+        f"| Runs with no missing values at all | {complete_runs:,} |",
+        "",
+        "Sensors by how much of their data is missing:",
+        "",
+        "| Missing | Sensors |",
+        "|---|---|",
+    ]
+    lines += [f"| {band} | {n} |" for band, n in ms.sensors_by_band.items()]
+    lines += [
+        "",
+        "Most-incomplete sensors:",
+        "",
+        "| Sensor | Missing |",
+        "|---|---|",
+    ]
+    lines += [f"| `{name}` | {pct(share)} |" for name, share in ms.worst_sensors]
+    lines += [
+        "",
+        f"![Missing values per sensor]({rel}/missing-per-sensor.png)",
+        "",
+        f"![Where values are missing]({rel}/missing-map.png)",
+        "",
+        "## Sensors that carry no signal",
+        "",
+        "| Measure | Sensors |",
+        "|---|---|",
+        f"| Constant (one value, or no values, across all runs) | {len(const)} |",
+        f"| Near-constant (one value is at least 95% of readings) | {len(near)} |",
+        "",
+        "## Time order",
+        "",
+        "| Measure | Value |",
+        "|---|---|",
+        f"| First run | {times.first:%Y-%m-%d %H:%M} |",
+        f"| Last run | {times.last:%Y-%m-%d %H:%M} |",
+        f"| Days with at least one run | {times.days_with_runs} |",
+        f"| Runs out of time order (earlier than the run before, in file order) | {times.out_of_order} |",
+        f"| Runs sharing a timestamp with an earlier run | {times.duplicate_timestamps} |",
+        f"| Median time between runs | {times.median_gap} |",
+        f"| Longest gap between consecutive runs | {times.longest_gap} "
+        f"(after run {times.longest_gap_after_run}) |",
+        "",
+        f"![Runs and fail rate by week]({rel}/weekly-fail-rate.png)",
+        "",
+        "## What this means for the pipeline",
+        "",
+        f"- **Missing values are normal, not errors.** {pct(ms.runs_with_any_missing / len(sensors))} "
+        "of runs have at least one. Rejecting any run with a missing value would throw away "
+        f"{ms.runs_with_any_missing:,} of {len(sensors):,} runs, so the validator records missing "
+        "values and rejects only structurally broken records.",
+        f"- **Not every sensor gets a control chart.** {len(const)} sensors never change. "
+        f"Excluding those and any sensor missing more than 50% of readings leaves "
+        f"**{len(monitorable_50)} monitorable sensors** (with a stricter 20% limit: {len(monitorable_20)}). "
+        "Proposed baseline rule: chart a sensor only if it varies and is missing at most 50% of the time; "
+        "the final rule is set with the baseline limits in the health-signals epic.",
+        f"- **Fails are rare** (about 1 in {balance.ratio + 1:.0f}), so fail-risk is judged on recall, "
+        "precision and PR-AUC, never accuracy: a model that always says pass would be "
+        f"{pct(balance.passes / balance.total)} accurate and useless.",
+        f"- **Time order:** the replay sends runs in file order. {times.out_of_order} runs are earlier than "
+        "the run before them in the original timestamps, so each record carries the original timestamp "
+        "for reference and a fresh send time as its event time.",
+        "",
+    ]
+    out_md.write_text("\n".join(lines))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--data-dir", type=Path, default=REPO / "data" / "raw")
+    parser.add_argument("--out", type=Path, default=REPO / "docs" / "data-profile.md")
+    args = parser.parse_args()
+
+    download(args.data_dir)
+    sensors = read_sensors((args.data_dir / "secom.data").read_text())
+    labels = read_labels((args.data_dir / "secom_labels.data").read_text())
+
+    chart_dir = args.out.parent / "data-profile"
+    chart_dir.mkdir(parents=True, exist_ok=True)
+    chart_missing_per_sensor(sensors, chart_dir / "missing-per-sensor.png")
+    chart_missing_map(sensors, chart_dir / "missing-map.png")
+    chart_weekly(weekly_fail_rate(labels), chart_dir / "weekly-fail-rate.png")
+    write_report(sensors, labels, args.data_dir, args.out, chart_dir)
+    print(f"Wrote {args.out} and 3 charts in {chart_dir}")
+    print("Paste the 'What this means for the pipeline' section back to Claude to check.")
+
+
+if __name__ == "__main__":
+    main()
