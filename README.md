@@ -19,7 +19,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | Repo, branch and pull-request workflow (protected `main`) | Built (Sprint 1) |
 | Terraform with remote state in S3 (native locking) | Built (Sprint 1) |
 | Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
-| AWS Budget and alerts, documented teardown | Planned (Sprint 1) |
+| AWS Budget and alerts, documented teardown | Built (Sprint 1) |
 | CI checks required before merge | Planned (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
@@ -67,6 +67,14 @@ terraform plan
 - **CI can't widen its own permissions.** The OIDC provider, the CI roles, the budget and the state bucket live in the bootstrap stack, which only the maintainer applies. Explicit denies stop the apply role touching its own roles, the state bucket's settings, or any region except eu-west-1.
 
 Full design: [docs/security.md](docs/security.md).
+
+## Cost controls
+
+- **Demo mode.** The services that bill by the hour (Kinesis, Fargate, RDS) live in the runtime stack, which is created for a demo and destroyed afterwards with `terraform destroy`. The long-lived bootstrap stack costs close to nothing.
+- **AWS Budget of $20 a month** for the whole account, managed in Terraform. It emails an alert when actual spend passes 50%, 80% and 100%, and when AWS forecasts the month will go over.
+- **Expensive defaults avoided on purpose:** no NAT gateway, no interface VPC endpoints, no customer-managed KMS keys.
+- **Measured, not guessed:** from AWS's own price list, the runtime stack would cost about $42 a month if left running, and about $2 for a month of demos (20 hours of runtime).
+- **Documented teardown**, including how to confirm nothing billable is left: [docs/teardown.md](docs/teardown.md). How each service is billed: [docs/costs.md](docs/costs.md).
 
 ## Way of working
 
