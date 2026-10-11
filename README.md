@@ -18,7 +18,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 |---|---|
 | Repo, branch and pull-request workflow (protected `main`) | Built (Sprint 1) |
 | Terraform with remote state in S3 (native locking) | Built (Sprint 1) |
-| Keyless CI authentication (GitHub OIDC → IAM) | In progress (Sprint 1) |
+| Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Planned (Sprint 1) |
 | CI checks required before merge | Planned (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
