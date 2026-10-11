@@ -38,3 +38,6 @@ data/*.data
 .DS_Store
 .vscode/
 .idea/
+
+# Per-person Terraform values that must not be published (e.g. the budget alert email)
+alerts.auto.tfvars
