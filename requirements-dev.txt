@@ -1,3 +1,5 @@
-# Tools for linting and testing. CI installs exactly this file.
+# Tools for linting, testing and data profiling. CI installs exactly this file.
 pytest>=8,<9
 ruff>=0.6,<1
+pandas>=2.2,<3
+matplotlib>=3.8,<4
