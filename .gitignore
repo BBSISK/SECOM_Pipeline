@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Environment and secrets (none should exist, but never commit them)
+.env
+.env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# Per-account backend settings: each copy of the repo uses its own state bucket
+backend.hcl
+# Keep: .terraform.lock.hcl (pins provider versions)
+
+# Data: SECOM is downloaded by script, never committed
+data/raw/
+data/*.csv
+data/*.data
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
