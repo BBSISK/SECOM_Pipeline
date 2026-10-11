@@ -20,7 +20,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | Terraform with remote state in S3 (native locking) | Built (Sprint 1) |
 | Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Built (Sprint 1) |
-| CI checks required before merge | Planned (Sprint 1) |
+| CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | In progress (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
 
@@ -59,6 +59,14 @@ terraform plan
 ```
 
 `bootstrap.sh` creates a state bucket named after your own AWS account ID and writes `infra/backend.hcl` for you, so nothing in the code needs editing. It shows the plan and asks before creating anything.
+
+## Testing and CI
+
+- **Every pull request runs CI** (GitHub Actions), and `main` only accepts a merge when both checks pass:
+  - `lint-and-test`: ruff (lint and formatting) and pytest unit tests.
+  - `terraform`: format check and validation of both Terraform stacks, then a `terraform plan` of the runtime stack, run in AWS through the keyless OIDC role.
+- **Unit tests run offline** with no AWS calls. Validation and health-signal logic get their own tests as they are built.
+- Details and the local commands: [docs/workflow.md](docs/workflow.md).
 
 ## Security
 

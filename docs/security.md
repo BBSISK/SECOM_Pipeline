@@ -38,6 +38,6 @@ The apply role's service permissions are scoped per service for now and will be 
 
 ## Checking it
 
-`.github/workflows/oidc-check.yml` runs on every pull request, signs in with the plan role and runs `aws sts get-caller-identity`. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
+The `terraform` job in `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It signs in with the plan role, runs `aws sts get-caller-identity`, then plans the runtime stack. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
 
 First green run (October 2026): `arn:aws:sts::<account>:assumed-role/secom-github-plan/GitHubActions`.
