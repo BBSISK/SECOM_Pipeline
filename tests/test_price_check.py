@@ -31,3 +31,7 @@ def test_on_demand_prices_skips_free_tiers():
 
 def test_on_demand_prices_handles_missing_terms():
     assert list(on_demand_prices({"terms": {}})) == []
+
+
+def test_deliberate_failure():
+    assert False
