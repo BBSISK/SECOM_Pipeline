@@ -20,7 +20,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | Terraform with remote state in S3 (native locking) | Built (Sprint 1) |
 | Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Built (Sprint 1) |
-| CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | In progress (Sprint 1) |
+| CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | Built (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
 
@@ -41,7 +41,7 @@ Replay producer (ECS Fargate) → Kinesis Data Streams → processor (Lambda, co
 
 - **GitHub repo with a protected `main` branch.** A branch ruleset (`protect-main`) applies to everyone, including the owner. Nobody can push straight to `main`, force-push over its history, or delete it. Every change arrives through a pull request.
 - **One branch and pull request per Jira story**, merged with squash merge only, so each story becomes one commit on `main`. Merged branches are deleted automatically.
-- **CI checks required before merge** are added in SECOM-13. Once they are, a pull request can't merge until the tests and Terraform checks pass.
+- **CI checks required before merge.** `lint-and-test` and `terraform` are required checks in the `protect-main` ruleset, so a pull request can't merge until both pass.
 - **Terraform state in S3** from the first apply: a versioned, encrypted, private bucket with S3 native locking. See [docs/bootstrap.md](docs/bootstrap.md).
 
 ### Run it on your own copy
@@ -66,6 +66,7 @@ terraform plan
   - `lint-and-test`: ruff (lint and formatting) and pytest unit tests.
   - `terraform`: format check and validation of both Terraform stacks, then a `terraform plan` of the runtime stack, run in AWS through the keyless OIDC role.
 - **Unit tests run offline** with no AWS calls. Validation and health-signal logic get their own tests as they are built.
+- **Proven, not assumed:** a test pull request with a deliberately failing test was blocked from merging ([screenshot](docs/evidence/secom-13-merge-blocked.png)), then closed.
 - Details and the local commands: [docs/workflow.md](docs/workflow.md).
 
 ## Security
