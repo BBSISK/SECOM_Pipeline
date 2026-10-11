@@ -1,0 +1,17 @@
+[project]
+name = "secom-pipeline"
+version = "0.1.0"
+description = "Streaming SPC pipeline on AWS over a simulated replay of the SECOM fab dataset"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, bugbear, pyupgrade
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
