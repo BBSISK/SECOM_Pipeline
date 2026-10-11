@@ -18,7 +18,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 |---|---|
 | Repo, branch and pull-request workflow (protected `main`) | Built (Sprint 1) |
 | Terraform with remote state in S3 (native locking) | Built (Sprint 1) |
-| Keyless CI authentication (GitHub OIDC → IAM) | Planned (Sprint 1) |
+| Keyless CI authentication (GitHub OIDC → IAM) | In progress (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Planned (Sprint 1) |
 | CI checks required before merge | Planned (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
@@ -59,6 +59,14 @@ terraform plan
 ```
 
 `bootstrap.sh` creates a state bucket named after your own AWS account ID and writes `infra/backend.hcl` for you, so nothing in the code needs editing. It shows the plan and asks before creating anything.
+
+## Security
+
+- **No long-lived AWS keys anywhere.** GitHub Actions signs in to AWS with GitHub OIDC: each run swaps a short-lived GitHub token for a one-hour IAM role session. The maintainer signs in with `aws login` (browser and MFA).
+- **Two CI roles.** `secom-github-plan` is read-only and can be used by pull requests. `secom-github-apply` can change the runtime stack and can only be used from `main`.
+- **CI can't widen its own permissions.** The OIDC provider, the CI roles, the budget and the state bucket live in the bootstrap stack, which only the maintainer applies. Explicit denies stop the apply role touching its own roles, the state bucket's settings, or any region except eu-west-1.
+
+Full design: [docs/security.md](docs/security.md).
 
 ## Way of working
 

@@ -12,3 +12,13 @@ output "region" {
   description = "Region used for all resources."
   value       = var.region
 }
+
+output "github_plan_role_arn" {
+  description = "Set as GitHub repository variable AWS_PLAN_ROLE_ARN (an identifier, not a secret)."
+  value       = aws_iam_role.github_plan.arn
+}
+
+output "github_apply_role_arn" {
+  description = "Set as GitHub repository variable AWS_APPLY_ROLE_ARN (an identifier, not a secret)."
+  value       = aws_iam_role.github_apply.arn
+}
