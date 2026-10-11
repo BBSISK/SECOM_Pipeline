@@ -13,8 +13,17 @@
 
 locals {
   github_repo_full = "${var.github_owner}/${var.github_repo}"
-  account_id       = data.aws_caller_identity.current.account_id
-  name_prefix      = "secom"
+
+  # GitHub now puts numeric IDs in the token's subject for some repos:
+  #   repo:OWNER@<owner_id>/REPO@<repo_id>:...
+  # The IDs never change, even if the repo is renamed, so they are the safer match.
+  # Both spellings are accepted so the trust works either way.
+  github_subject_repos = [
+    local.github_repo_full,
+    "${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}",
+  ]
+  account_id  = data.aws_caller_identity.current.account_id
+  name_prefix = "secom"
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -46,10 +55,12 @@ data "aws_iam_policy_document" "plan_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${local.github_repo_full}:pull_request",
-        "repo:${local.github_repo_full}:ref:refs/heads/main",
-      ]
+      values = flatten([
+        for r in local.github_subject_repos : [
+          "repo:${r}:pull_request",
+          "repo:${r}:ref:refs/heads/main",
+        ]
+      ])
     }
   }
 }
@@ -119,7 +130,7 @@ data "aws_iam_policy_document" "apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.github_repo_full}:ref:refs/heads/main"]
+      values   = [for r in local.github_subject_repos : "repo:${r}:ref:refs/heads/main"]
     }
   }
 }

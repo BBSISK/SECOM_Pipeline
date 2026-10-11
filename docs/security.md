@@ -16,6 +16,8 @@ There are **no long-lived AWS access keys** anywhere in this project: not in Git
 3. AWS checks the signature against the IAM OIDC provider for `token.actions.githubusercontent.com`, then checks the token's claims against the role's trust policy (audience `sts.amazonaws.com`, and the exact repo and ref).
 4. If both match, AWS returns credentials that expire after one hour.
 
+**Subject claim gotcha.** For this repo GitHub's token names the repo with numeric IDs (`repo:OWNER@<owner_id>/REPO@<repo_id>:...`), not only the plain name. The trust policies accept both spellings; the IDs come from `infra/bootstrap/terraform.tfvars`. The first CI run failed with `Not authorized to perform sts:AssumeRoleWithWebIdentity` until the ID form was added.
+
 The role ARNs are stored as GitHub **repository variables** (`AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN`), not secrets, because an ARN is an identifier, not a credential.
 
 ## The two CI roles
@@ -36,4 +38,6 @@ The apply role's service permissions are scoped per service for now and will be 
 
 ## Checking it
 
-`.github/workflows/oidc-check.yml` signs in with the plan role and runs `aws sts get-caller-identity`. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
+`.github/workflows/oidc-check.yml` runs on every pull request, signs in with the plan role and runs `aws sts get-caller-identity`. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
+
+First green run (October 2026): `arn:aws:sts::<account>:assumed-role/secom-github-plan/GitHubActions`.

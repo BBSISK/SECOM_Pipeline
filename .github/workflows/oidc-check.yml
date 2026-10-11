@@ -1,4 +1,3 @@
-# Move this file to .github/workflows/oidc-check.yml (see docs/security.md).
 # Proves GitHub Actions can reach AWS with no stored keys.
 name: oidc-check
 
