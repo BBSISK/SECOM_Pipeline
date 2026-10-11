@@ -27,3 +27,13 @@ variable "github_repo" {
   type        = string
   default     = "SECOM_Pipeline"
 }
+
+variable "github_owner_id" {
+  description = "Numeric GitHub ID of the repo owner (curl -s https://api.github.com/users/<owner> | grep '\"id\"')."
+  type        = number
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub ID of the repo (curl -s https://api.github.com/repos/<owner>/<repo> | grep -m1 '\"id\"')."
+  type        = number
+}
