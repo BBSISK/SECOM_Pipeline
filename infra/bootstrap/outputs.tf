@@ -22,3 +22,8 @@ output "github_apply_role_arn" {
   description = "Set as GitHub repository variable AWS_APPLY_ROLE_ARN (an identifier, not a secret)."
   value       = aws_iam_role.github_apply.arn
 }
+
+output "producer_repository_url" {
+  description = "ECR repository for the replay producer image."
+  value       = aws_ecr_repository.producer.repository_url
+}

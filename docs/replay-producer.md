@@ -92,3 +92,14 @@ docker run --rm -v "$PWD/data/raw:/data:ro" -e RATE_SECONDS=1 -e MAX_RECORDS=5 s
 ```
 
 The image runs as an unprivileged user and contains only the producer code, no third-party packages and no data. CI builds it on every pull request and runs it against a small fake dataset (`scripts/fake_secom.py`), checking every record against the contract.
+
+## Published images
+
+On every merge to `main` that touches the producer, the `publish` workflow builds the image and pushes it to a private Amazon ECR repository, `secom-producer`:
+
+- **Tagged with the commit SHA**, and tags are immutable, so an image tag always points to exactly the code in that commit.
+- **Signed in keylessly**: the workflow uses the GitHub OIDC apply role, which only `main` can assume.
+- **Scanned on push** for known vulnerabilities. The workflow waits for the scan, shows the counts on the run page, and fails if anything critical is found.
+- **Lifecycle policy**: untagged images expire after a day and only the 10 most recent are kept, so storage stays at a few cents.
+
+The repository lives in the long-lived bootstrap stack (`infra/bootstrap/ecr.tf`), so images survive between demos.
