@@ -95,3 +95,28 @@ jobs:
             tail -n 40 plan.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  producer-image:
+    name: producer-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the replay producer image
+        run: docker build -f producer/Dockerfile -t secom-producer:ci .
+
+      - name: Smoke test on fake data (the real dataset is never in CI)
+        run: |
+          python scripts/fake_secom.py --runs 5 --out "$RUNNER_TEMP/fake-secom"
+          docker run --rm \
+            -v "$RUNNER_TEMP/fake-secom:/data:ro" \
+            -e RATE_SECONDS=0 \
+            secom-producer:ci > "$RUNNER_TEMP/replay.jsonl"
+          python scripts/check_replay_output.py "$RUNNER_TEMP/replay.jsonl" --expect 5
+
+      - name: Image size
+        run: docker image ls secom-producer:ci --format "{{.Repository}}:{{.Tag}} {{.Size}}" >> "$GITHUB_STEP_SUMMARY"

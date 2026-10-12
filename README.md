@@ -22,7 +22,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | AWS Budget and alerts, documented teardown | Built (Sprint 1) |
 | CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | Built (Sprint 1) |
 | Stream record contract (JSON Schema, validator, reject reason codes) | Built (Sprint 1) |
-| Replay producer | Planned (Sprint 1) |
+| Replay producer: ordered replay, rate control, seeded chaos mode, container image built and smoke-tested in CI (local output; Kinesis in Sprint 2) | Built (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
 
 Nothing is running in production yet.
@@ -89,6 +89,14 @@ Full design: [docs/security.md](docs/security.md).
 ## Way of working
 
 Jira Scrum (two-week sprints), one branch and pull request per story, protected `main`. See [docs/workflow.md](docs/workflow.md).
+
+## How the live stream is simulated
+
+**The stream is a simulated replay of real fab data.** SECOM is a fixed, historical dataset, so a replay producer (`secom/producer.py`, in its own container) sends its 1,567 runs one at a time, in their original order, at a set rate, as if they were coming off the line now. Each record gets a fresh `sent_at` as its event time and keeps the run's real 2008 timestamp for reference.
+
+A real feed is messy, so the producer has a seeded **chaos mode** that drops, duplicates, delays and corrupts records on purpose. At the end it prints exactly what it did, so the pipeline's own counts of gaps, duplicates, late records and rejects can be checked against the truth.
+
+Details, settings and how to run it: [docs/replay-producer.md](docs/replay-producer.md).
 
 ## Stream record contract
 

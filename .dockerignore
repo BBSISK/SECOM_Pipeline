@@ -1,0 +1,14 @@
+# Keep the build context small and free of local data, secrets and caches.
+.git
+.github
+.venv
+data
+docs
+infra
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.tfplan
+*.tfstate*
+.env
