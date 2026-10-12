@@ -21,6 +21,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Built (Sprint 1) |
 | CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | Built (Sprint 1) |
+| Stream record contract (JSON Schema, validator, reject reason codes) | Built (Sprint 1) |
 | Replay producer | Planned (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
 
@@ -88,6 +89,16 @@ Full design: [docs/security.md](docs/security.md).
 ## Way of working
 
 Jira Scrum (two-week sprints), one branch and pull request per story, protected `main`. See [docs/workflow.md](docs/workflow.md).
+
+## Stream record contract
+
+Each production run travels the stream as one JSON record with a fixed contract: identity (`replay_id`, `seq`, `run_id`), times (`sent_at` as the event time, `original_ts` for reference), the pass/fail `label`, and exactly 590 sensor readings with `null` for missing.
+
+- **Rejected** only when structurally broken, with one of ten reason codes (for example `WRONG_SENSOR_COUNT`, `BAD_TIMESTAMP`, `DUPLICATE`) so rejects can be counted by cause.
+- **Accepted and flagged** for conditions that are normal in a real feed: missing readings, gaps in `seq`, late or out-of-order arrival.
+- Defined twice and kept in step by tests: a Python validator (`secom/contract.py`) and a JSON Schema (`schemas/run-record.schema.json`).
+
+Full field list, reason codes and an example: [docs/record-contract.md](docs/record-contract.md).
 
 ## Data
 

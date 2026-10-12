@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BBSISK/SECOM_Pipeline/schemas/run-record.schema.json",
+  "title": "SECOM run record",
+  "description": "One production run, as published by the replay producer onto the stream. See docs/record-contract.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "replay_id", "seq", "run_id", "sent_at", "original_ts", "label", "sensors"],
+  "properties": {
+    "schema_version": {
+      "description": "Version of this contract. Bumped on any breaking change.",
+      "const": 1
+    },
+    "replay_id": {
+      "description": "Identifies one replay session. seq restarts at 0 for each new replay_id.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "seq": {
+      "description": "Send sequence number within the replay session, starting at 0. A gap means a record was lost.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_id": {
+      "description": "Row number of the run in secom.data, starting at 0. The record's identity: duplicates share a run_id.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1566
+    },
+    "sent_at": {
+      "description": "When the producer sent the record (UTC, ISO 8601 with Z). The event time used downstream.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$"
+    },
+    "original_ts": {
+      "description": "The run's timestamp in the original dataset (fab local time, no time zone). For reference only.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$"
+    },
+    "label": {
+      "description": "In-line test result: -1 = pass, 1 = fail.",
+      "enum": [-1, 1]
+    },
+    "sensors": {
+      "description": "The 590 sensor readings in column order. null means the reading is missing (normal in SECOM).",
+      "type": "array",
+      "minItems": 590,
+      "maxItems": 590,
+      "items": {"type": ["number", "null"]}
+    }
+  }
+}
