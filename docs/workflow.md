@@ -13,11 +13,12 @@ Work is planned in a team-managed Scrum project in Jira (key `SECOM`), in two-we
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`. Two jobs must pass before a pull request can merge (they are required checks in the `protect-main` ruleset):
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`. Three jobs must pass before a pull request can merge (they are required checks in the `protect-main` ruleset):
 
 | Check | What it does |
 |---|---|
 | `lint-and-test` | `ruff check` and `ruff format --check` (style and common bugs), then `pytest` (unit tests) |
+| `producer-image` | Builds the producer container and runs it on fake data; every record must pass the contract |
 | `terraform` | `terraform fmt -check`, `terraform validate` on both stacks, then signs in to AWS with GitHub OIDC (read-only role, no stored keys) and runs `terraform plan` on the runtime stack. The plan's summary appears on the run page |
 
 Run the same checks locally before pushing:
@@ -42,4 +43,4 @@ git commit -m "SECOM-10 Terraform bootstrap with remote state"
 git push -u origin SECOM-10-terraform-bootstrap
 ```
 
-Then open the pull request on GitHub, wait for both CI checks to go green, and squash-merge.
+Then open the pull request on GitHub, wait for all three CI checks to go green, and squash-merge.
