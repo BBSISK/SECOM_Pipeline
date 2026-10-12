@@ -58,7 +58,9 @@ jobs:
         env:
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          docker build -f producer/Dockerfile \
+          # --provenance/--sbom off: push one plain image manifest. With attestations, docker pushes an
+          # image index instead, and ECR basic scanning does not scan an index (ScanNotFoundException).
+          docker build -f producer/Dockerfile --provenance=false --sbom=false \
             --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
             --label org.opencontainers.image.revision="${{ github.sha }}" \
             -t "$IMAGE" .
@@ -66,7 +68,23 @@ jobs:
 
       - name: Wait for the vulnerability scan and report it
         run: |
-          aws ecr wait image-scan-complete --repository-name "$ECR_REPOSITORY" --image-id imageTag="${{ github.sha }}"
+          # The scan starts a few seconds after the push, so poll for up to 5 minutes.
+          for attempt in $(seq 1 30); do
+            status=$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" \
+              --image-id imageTag="${{ github.sha }}" \
+              --query 'imageScanStatus.status' --output text 2>/dev/null || echo "PENDING")
+            echo "Scan status (attempt $attempt): $status"
+            [ "$status" = "COMPLETE" ] && break
+            if [ "$status" = "FAILED" ] || [ "$status" = "UNSUPPORTED_IMAGE" ]; then
+              echo "::error::Image scan ended with status $status"
+              exit 1
+            fi
+            sleep 10
+          done
+          if [ "$status" != "COMPLETE" ]; then
+            echo "::error::Image scan did not complete within 5 minutes"
+            exit 1
+          fi
           findings=$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" \
             --image-id imageTag="${{ github.sha }}" \
             --query 'imageScanFindings.findingSeverityCounts' --output json)
