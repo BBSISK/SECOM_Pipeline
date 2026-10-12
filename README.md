@@ -23,6 +23,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | Built (Sprint 1) |
 | Stream record contract (JSON Schema, validator, reject reason codes) | Built (Sprint 1) |
 | Replay producer: ordered replay, rate control, seeded chaos mode, container image built and smoke-tested in CI (local output; Kinesis in Sprint 2) | Built (Sprint 1) |
+| Private image registry (Amazon ECR): immutable tags, scan on push, lifecycle policy; CI publishes the producer image on every merge to main via the keyless role | Built (Sprint 1) |
 | Stream ingest, validation, storage, health signals, dashboard | Planned |
 
 Nothing is running in production yet.

@@ -1,0 +1,73 @@
+# Publish the replay producer image to Amazon ECR on every merge to main (SECOM-16).
+# Signs in with the keyless OIDC apply role, which only main can assume.
+name: publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "secom/**"
+      - "producer/**"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC token for AWS (no stored keys)
+
+concurrency:
+  group: publish-producer
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: secom-producer
+
+jobs:
+  producer-image:
+    name: publish-producer-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to AWS with OIDC (apply role, main only)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push, tagged with the commit SHA
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -f producer/Dockerfile \
+            --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Wait for the vulnerability scan and report it
+        run: |
+          aws ecr wait image-scan-complete --repository-name "$ECR_REPOSITORY" --image-id imageTag="${{ github.sha }}"
+          findings=$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" \
+            --image-id imageTag="${{ github.sha }}" \
+            --query 'imageScanFindings.findingSeverityCounts' --output json)
+          {
+            echo "### Producer image published"
+            echo ""
+            echo "\`$IMAGE\`"
+            echo ""
+            echo "Vulnerability scan (counts by severity; {} means none found):"
+            echo '```json'
+            echo "$findings"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if echo "$findings" | grep -q '"CRITICAL"'; then
+            echo "::error::Critical vulnerabilities found in the producer image"
+            exit 1
+          fi
