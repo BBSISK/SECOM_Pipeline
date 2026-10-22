@@ -1,5 +1,5 @@
 # Tools for linting, testing and data profiling. CI installs exactly this file.
-pytest>=9.0.3,<10
+pytest>=9.1.1,<10
 ruff>=0.6,<1
 pandas>=2.2,<3
 matplotlib>=3.8,<4
