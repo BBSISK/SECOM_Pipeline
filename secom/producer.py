@@ -206,7 +206,8 @@ def replay(
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> Iterator[Outgoing]:
     """Yield payloads in the order they should be sent. Pure apart from the clock: no I/O, no sleeping."""
-    rng = random.Random(config.chaos_seed)
+    # Chaos sampling must be repeatable from a seed; nothing here is a secret, so no crypto RNG needed.
+    rng = random.Random(config.chaos_seed)  # noqa: S311
     summary.replay_id = config.replay_id or default_replay_id(clock())
     held: list[tuple[int, Outgoing]] = []  # (release after this many more sends, record)
 

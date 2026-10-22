@@ -194,10 +194,23 @@ data "aws_iam_policy_document" "apply_permissions" {
     resources = ["*"]
   }
 
-  # S3 buckets for the pipeline's own data, named secom-*.
+  # S3 buckets for the pipeline's own data, named secom-*. Listed by action family rather than "s3:*"
+  # (flagged by the Trivy config scan, AWS-0345): no access points, batch jobs, Object Lambda or
+  # other S3 features the pipeline does not use.
   statement {
-    sid       = "PipelineBuckets"
-    actions   = ["s3:*"]
+    sid = "PipelineBuckets"
+    actions = [
+      "s3:CreateBucket", "s3:DeleteBucket",
+      "s3:ListBucket", "s3:ListBucketVersions", "s3:ListBucketMultipartUploads",
+      "s3:GetBucket*", "s3:PutBucket*", "s3:DeleteBucketPolicy", "s3:DeleteBucketOwnershipControls",
+      "s3:GetAccelerateConfiguration", "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration",
+      "s3:GetReplicationConfiguration", "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
+      "s3:GetIntelligentTieringConfiguration", "s3:GetAnalyticsConfiguration",
+      "s3:GetInventoryConfiguration", "s3:GetMetricsConfiguration",
+      "s3:GetObject", "s3:GetObjectVersion", "s3:GetObjectTagging",
+      "s3:PutObject", "s3:PutObjectTagging",
+      "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload",
+    ]
     resources = ["arn:aws:s3:::${local.name_prefix}-*", "arn:aws:s3:::${local.name_prefix}-*/*"]
   }
 

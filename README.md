@@ -23,6 +23,7 @@ I spent 30 years at Intel in high-volume semiconductor manufacturing (SPC, FMEA,
 | Keyless CI authentication (GitHub OIDC → IAM) | Built (Sprint 1) |
 | AWS Budget and alerts, documented teardown | Built (Sprint 1) |
 | CI checks required before merge (ruff, pytest, Terraform fmt/validate/plan) | Built (Sprint 1) |
+| Shift-left security gate in CI: Bandit rules, pip-audit, Trivy config and image scans, Hadolint, secret push protection, Dependabot | Built (Sprint 2) |
 | Stream record contract (JSON Schema, validator, reject reason codes) | Built (Sprint 1) |
 | Replay producer: ordered replay, rate control, seeded chaos mode, container image built and smoke-tested in CI (local output; Kinesis in Sprint 2) | Built (Sprint 1) |
 | Private image registry (Amazon ECR): immutable tags, scan on push, lifecycle policy; CI publishes the producer image on every merge to main via the keyless role | Built (Sprint 1) |
@@ -96,7 +97,7 @@ flowchart TB
 | Lambda | Processor: validates records, writes raw and clean data, computes signals; later the read-only MCP server | Runtime | Planned (Sprint 2) |
 | SQS | Dead-letter queue for batches the processor can't handle | Runtime | Planned (Sprint 2) |
 | S3 (raw zone) | Every record exactly as received, including rejects, partitioned by date | Runtime | Planned (Sprint 2) |
-| RDS PostgreSQL | Cleaned runs, control limits, SPC signals and the reject log; IAM database sign-in, no passwords in code | Runtime | Planned (Sprint 2) |
+| RDS PostgreSQL | Cleaned runs, control limits, SPC signals and the reject log; IAM database sign-in, no passwords in code | Runtime | Planned (Sprint 3) |
 | CloudWatch | Logs, and alarms on stream lag and the dead-letter queue | Runtime | Planned |
 
 Region: eu-west-1 (Ireland). All of it is Terraform.
@@ -169,6 +170,9 @@ Rows in, rows rejected and why will be reported here from the processor's own co
 - **No long-lived AWS keys anywhere.** GitHub Actions signs in to AWS with GitHub OIDC: each run swaps a short-lived GitHub token for a one-hour IAM role session. The maintainer signs in with `aws login` (browser and MFA).
 - **Two CI roles.** `secom-github-plan` is read-only and can be used by pull requests. `secom-github-apply` can change the runtime stack and can only be used from `main`.
 - **CI can't widen its own permissions.** The OIDC provider, the CI roles, the budget and the state bucket live in the bootstrap stack, which only the maintainer applies. Explicit denies stop the apply role touching its own roles, the state bucket's settings, or any region except eu-west-1.
+- **Shift-left security gate on every pull request.** Ruff's Bandit (`S`) rules, pip-audit, a Trivy config scan of the Terraform and Dockerfile, Hadolint, and a Trivy image scan all run inside the required CI checks, so a finding blocks the merge. GitHub secret scanning with push protection refuses pushes that contain credentials, and Dependabot opens weekly update pull requests.
+- **The gate found real issues when it was switched on:** 26 known vulnerabilities in `pytest` and `pillow` (upgraded), and an over-broad `s3:*` permission on the CI apply role (narrowed). One finding is accepted on purpose, with the reason recorded: the state bucket uses AWS-managed rather than customer-managed encryption, to stay inside the $20 budget.
+- **Supply chain:** third-party GitHub Actions are pinned to commit SHAs, and the security tools are downloaded with a checksum check, so a moved tag or a tampered release can't run in CI.
 
 Full design: [docs/security.md](docs/security.md).
 
@@ -240,7 +244,13 @@ Jira Scrum (two-week sprints), one branch and pull request per story, protected 
 | SECOM-17 | Stream record contract: validator, JSON Schema, ten reject reason codes |
 | SECOM-18 | README v1: architecture diagram and AWS service table |
 
-**Next, Sprint 2:** the streaming runtime on AWS: Kinesis stream, producer on ECS Fargate writing to it, Lambda processor with validation and the reject log, S3 raw zone and RDS PostgreSQL.
+**Sprint 2 (22 October - 4 November 2026): the live stream on AWS. In progress.** Sprint goal: records stream live from the producer on Fargate through Kinesis into a Lambda that validates them and lands raw data in S3, with reject counts reconciled against the chaos summary, behind a shift-left security gate.
+
+| Story | Delivered |
+|---|---|
+| SECOM-19 | Shift-left security gate in CI; found and fixed 26 dependency vulnerabilities and an over-broad IAM permission; blocked a demo pull request with a vulnerable base image |
+
+Still to come in Sprint 2: SNS alert channel, runtime network, demo-mode up and down workflows, Kinesis stream, producer on ECS Fargate writing to it, S3 raw zone, Lambda processor, and an end-to-end chaos replay. RDS PostgreSQL and the SPC signals follow in Sprint 3.
 
 ## Repo layout
 
