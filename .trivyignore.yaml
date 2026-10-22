@@ -1,0 +1,10 @@
+# Accepted findings from the Trivy config scan (SECOM-19). Each one is a deliberate decision, with the reason.
+# Anything not listed here fails CI at HIGH or CRITICAL. Reviewed whenever the infrastructure changes.
+misconfigurations:
+  - id: AWS-0132
+    paths:
+      - "infra/bootstrap/main.tf"
+    statement: >-
+      Terraform state bucket uses SSE-S3 (AES-256) rather than a customer-managed KMS key. Deliberate:
+      a CMK costs $1/month plus requests against a $20/month budget, and the bucket is already private,
+      versioned, TLS-only and readable only by the maintainer and the two CI roles. See docs/costs.md.

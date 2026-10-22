@@ -1,6 +1,9 @@
 # Tools for linting, testing and data profiling. CI installs exactly this file.
-pytest>=8,<9
+pytest>=9.0.3,<10
 ruff>=0.6,<1
 pandas>=2.2,<3
 matplotlib>=3.8,<4
 jsonschema>=4,<5
+# Not used directly: matplotlib depends on it. Set a floor because pip-audit (SECOM-19) found known
+# vulnerabilities in the 12.x releases that matplotlib would otherwise install.
+pillow>=13.0.0

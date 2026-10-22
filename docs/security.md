@@ -41,3 +41,48 @@ The apply role's service permissions are scoped per service for now and will be 
 The `terraform` job in `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It signs in with the plan role, runs `aws sts get-caller-identity`, then plans the runtime stack. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
 
 First green run (October 2026): `arn:aws:sts::<account>:assumed-role/secom-github-plan/GitHubActions`.
+
+## Shift-left security gate (SECOM-19)
+
+Security checks run on **every pull request**, inside the three CI checks that the `protect-main` ruleset already requires. A finding blocks the merge, so problems are fixed before anything reaches `main` or AWS, not found afterwards.
+
+| Check | Tool | Runs in CI job | Fails the pull request when |
+|---|---|---|---|
+| Insecure Python patterns | Ruff `S` rules (the Bandit rule set) | `lint-and-test` | Any finding |
+| Vulnerable Python dependencies | pip-audit (PyPI advisory database) | `lint-and-test` | Any known vulnerability in `requirements-dev.txt`, including packages pulled in indirectly |
+| Terraform and Dockerfile misconfiguration | Trivy `config` | `terraform` | Any HIGH or CRITICAL finding not listed in `.trivyignore.yaml` |
+| Dockerfile best practice | Hadolint | `producer-image` | Any warning or error |
+| Vulnerable packages in the image | Trivy `image` | `producer-image` | Any HIGH or CRITICAL vulnerability that has a fix |
+| Secrets in commits | GitHub secret scanning with push protection | Before the push lands | A push containing a recognised secret is refused |
+| Out-of-date dependencies | Dependabot (pip, GitHub Actions, base image) | Weekly | Never fails; opens update pull requests that go through this same gate |
+
+After merge, the publish workflow adds one more check: ECR scans the pushed image and the run fails on any CRITICAL finding.
+
+### What the gate found when it was switched on
+
+The first run of the new checks against the existing code found three real issues, all fixed in the same pull request:
+
+- **pip-audit:** 26 known vulnerabilities in two packages. `pytest` 8.4 (fixed in 9.0.3) and `pillow` 12.x, which `matplotlib` installs indirectly (fixed in 13.0.0). Fix: raised `pytest` to `>=9.0.3` and added a `pillow>=13.0.0` floor in `requirements-dev.txt`.
+- **Trivy config, AWS-0345 (HIGH):** the CI apply role allowed `s3:*` on the pipeline's `secom-*` buckets. Fix: replaced with the specific S3 action families the runtime stack needs. This is a bootstrap-stack change, applied by the maintainer, not by CI.
+- **Trivy config, AWS-0132 (HIGH):** the Terraform state bucket uses AWS-managed encryption (SSE-S3) rather than a customer-managed KMS key. **Accepted, not fixed** (see below).
+
+Ruff's `S` rules raised two findings in non-test code, both reviewed and marked with a `noqa` comment and the reason: the chaos mode's `random.Random` (needs a repeatable seed and protects no secret) and `price_check.py`'s `subprocess.run` (a fixed argument list with no shell). In tests, `assert`, seeded random data and running the repo's own scripts are allowed through `per-file-ignores` in `pyproject.toml`.
+
+### Accepted findings
+
+Every accepted finding is listed in [`.trivyignore.yaml`](../.trivyignore.yaml) with its reason, so the exception is visible and reviewed rather than silent.
+
+| Finding | Where | Why it is accepted |
+|---|---|---|
+| AWS-0132: no customer-managed KMS key | Terraform state bucket | A KMS key costs $1 a month plus request charges against a $20 monthly budget. The bucket is already private, versioned, TLS-only and readable only by the maintainer and the two CI roles |
+
+LOW findings are reported but don't fail the build. Current ones: ECR and S3 encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
+
+### Supply chain
+
+- **Third-party GitHub Actions are pinned to a commit SHA**, not a tag, with the version in a comment. A tag can be moved to point at different code; a commit SHA cannot. Dependabot proposes SHA updates.
+- **Trivy and Hadolint are downloaded as release binaries and checked against a SHA-256 written in `ci.yml`.** If the download doesn't match, the job stops before running it. This is a direct response to the March 2026 compromise of Trivy's own release process and GitHub Actions ([GHSA-69fq-xp46-6x23](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23), CVE-2026-33634), where moved tags and a tampered release ran attacker code in other projects' CI. Dependabot can't update these two, so their version and checksum are bumped together by hand.
+
+### Proving the gate blocks
+
+To show the gate works, a demonstration pull request changed the producer's base image to an old Python release with known, fixed vulnerabilities. The `producer-image` check failed on the Trivy image scan and the ruleset blocked the merge. The pull request was then closed without merging. Evidence: `docs/evidence/secom-19-trivy-blocked.png`.

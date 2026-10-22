@@ -9,8 +9,12 @@ line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
-# pycodestyle, pyflakes, import order, bugbear, pyupgrade
-select = ["E", "F", "I", "B", "UP"]
+# pycodestyle, pyflakes, import order, bugbear, pyupgrade, and S: flake8-bandit security rules (SECOM-19)
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use plain assert (that is how pytest works), seeded random data, and run the repo's own scripts.
+"tests/**" = ["S101", "S311", "S603"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

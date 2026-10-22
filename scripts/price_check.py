@@ -64,7 +64,8 @@ def get_products(profile, service, filters):
         args.append(f"Type=TERM_MATCH,Field={field},Value={value}")
     if profile:
         args += ["--profile", profile]
-    out = subprocess.run(args, check=True, capture_output=True, text=True).stdout
+    # A fixed argument list and no shell; the only inputs are constants and the --profile name.
+    out = subprocess.run(args, check=True, capture_output=True, text=True).stdout  # noqa: S603
     return [json.loads(item) for item in json.loads(out)["PriceList"]]
 
 
