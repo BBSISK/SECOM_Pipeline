@@ -1,7 +1,7 @@
 # Replay producer image (SECOM-15).
 # Build from the repo root:  docker build -f producer/Dockerfile -t secom-producer .
 # Pulled from Amazon ECR Public (a mirror of the official Docker image) to avoid Docker Hub rate limits in CI.
-FROM public.ecr.aws/docker/library/python:3.12-slim
+FROM public.ecr.aws/docker/library/python:3.15-slim
 
 # No .pyc files, unbuffered logs (so CloudWatch sees each line straight away).
 ENV PYTHONDONTWRITEBYTECODE=1 \
