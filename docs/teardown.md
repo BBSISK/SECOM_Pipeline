@@ -33,13 +33,19 @@ They share one concurrency lock, so an up and a down never run at the same time.
 
 **Safety net.** `runtime-down` also runs every hour. If the Terraform state shows the stack is up and the last successful `runtime-up` was more than **4 hours** ago (`MAX_UP_HOURS` in the workflow), it destroys the stack and emails the maintainer. It reads "up" from the state itself, so a stack applied from a laptop is caught too (with no `runtime-up` run to date it, it counts as overdue). When the stack is down, the hourly run does nothing.
 
-The tag check signs in with the read-only plan role, because the apply role has no access to the tag API. The tag index can lag a few minutes behind a delete, so a resource listed straight after a destroy is a warning to re-check, not proof something survived.
+The tag check signs in with the read-only plan role, because the apply role has no access to the tag API. The tag index can lag a few minutes behind a delete, so a resource listed straight after a destroy is a warning to re-check, not proof something survived. On the first cycle it listed four already-deleted resources (a subnet, a security group, a rule and an S3 endpoint); `aws ec2 describe-subnets` / `describe-vpc-endpoints` on those IDs returned *NotFound*, and no VPC carried the project tag. To confirm by hand:
+
+```bash
+aws ec2 describe-vpcs --region eu-west-1 --filters Name=tag:Project,Values=secom-pipeline --query "Vpcs[].VpcId" --output text
+```
+
+Empty output means no runtime network exists.
 
 ### Up/down cycles
 
 | Date | Stack contents | Up for | Cost |
 |---|---|---|---|
-| _first cycle recorded after merge_ | | | |
+| 23 Oct 2026 | Network only (SECOM-21: VPC, 2 subnets, IGW, route table, S3 gateway endpoint, 2 security groups; 11 resources) | 22:27 to 22:32 UTC, about 5 minutes. runtime-up ran in 45 s, runtime-down in 57 s | **$0** (no resource in the network bills) |
 
 ## Tear down by hand (if the workflows can't run)
 
