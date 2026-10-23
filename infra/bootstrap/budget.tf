@@ -43,7 +43,7 @@ variable "monthly_budget_usd" {
 }
 
 variable "budget_alert_email" {
-  description = "Email address for budget alerts. Set in alerts.auto.tfvars, which is gitignored."
+  description = "Email address for budget and pipeline alerts (SNS topic secom-alerts). Set in alerts.auto.tfvars, which is gitignored."
   type        = string
   sensitive   = true
 }

@@ -25,14 +25,14 @@ The role ARNs are stored as GitHub **repository variables** (`AWS_PLAN_ROLE_ARN`
 | Role | Who can assume it | What it can do |
 |---|---|---|
 | `secom-github-plan` | This repo's pull requests and `main` branch | Read-only (`ReadOnlyAccess`), plus creating and deleting the Terraform `.tflock` file so `terraform plan` can lock state |
-| `secom-github-apply` | This repo's `main` branch only (merged pull requests) | Create and change the **runtime** stack's resources; read and write only the runtime state |
+| `secom-github-apply` | This repo's `main` branch only (merged pull requests) | Create and change the **runtime** stack's resources; read and write only the runtime state; publish (only) to the `secom-alerts` topic |
 
 Guardrails on the apply role:
 
 - **No self-escalation.** It can manage only IAM roles and policies named `secom-*`, and an explicit deny stops it touching the two GitHub roles or the OIDC provider.
 - **The state bucket is protected.** An explicit deny stops it changing the bucket's policy, versioning, encryption or lifecycle, or deleting it.
 - **One region.** Regional services are denied outside `eu-west-1`.
-- **The bootstrap stack is never applied by CI.** The OIDC provider, these roles, the AWS Budget and the state bucket are applied by the maintainer from a laptop, so CI cannot widen its own permissions.
+- **The bootstrap stack is never applied by CI.** The OIDC provider, these roles, the AWS Budget, the alert topic and the state bucket are applied by the maintainer from a laptop, so CI cannot widen its own permissions.
 
 The apply role's service permissions are scoped per service for now and will be tightened to named resources as each one is added.
 
@@ -41,6 +41,15 @@ The apply role's service permissions are scoped per service for now and will be 
 The `terraform` job in `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It signs in with the plan role, runs `aws sts get-caller-identity`, then plans the runtime stack. A green run that shows `assumed-role/secom-github-plan/...` proves CI reached AWS without any stored key.
 
 First green run (October 2026): `arn:aws:sts::<account>:assumed-role/secom-github-plan/GitHubActions`.
+
+## Alerts (SECOM-20)
+
+Failures are sent to a human by email instead of waiting in a log.
+
+- **One topic, `secom-alerts`** (Amazon SNS), in the bootstrap stack, with an email subscription. The address lives in the gitignored `alerts.auto.tfvars`, never in the repo, and SNS delivers nothing until the emailed confirmation link is clicked.
+- **CI can publish, nothing more.** The apply role has `sns:Publish` on this one topic only. It can't subscribe, unsubscribe or change the topic, so a compromised workflow can't redirect or silence alerts.
+- **What sends to it:** the `publish` workflow, when any step after the AWS sign-in fails. The alert names the failing step, the image scan counts (if the scan ran), the commit and a link to the run. If the sign-in itself fails, GitHub's own failed-run email is the notice. Running `publish` by hand with **test_alert** ticked sends a test message.
+- **Encryption:** the AWS-managed SNS key (`alias/aws/sns`), at no cost. **Known limit:** CloudWatch alarms can't publish to a topic encrypted with an AWS-managed key (its key policy can't be edited to let CloudWatch use it). This has to be resolved, at $0, before the CloudWatch alarm stories (SECOM-23 stream lag, SECOM-27 dead-letter queue).
 
 ## Shift-left security gate (SECOM-19)
 
@@ -76,7 +85,7 @@ Every accepted finding is listed in [`.trivyignore.yaml`](../.trivyignore.yaml) 
 |---|---|---|
 | AWS-0132: no customer-managed KMS key | Terraform state bucket | A KMS key costs $1 a month plus request charges against a $20 monthly budget. The bucket is already private, versioned, TLS-only and readable only by the maintainer and the two CI roles |
 
-LOW findings are reported but don't fail the build. Current ones: ECR and S3 encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
+LOW findings are reported but don't fail the build. Current ones: ECR, S3 and the SNS alert topic encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
 
 ### Supply chain
 

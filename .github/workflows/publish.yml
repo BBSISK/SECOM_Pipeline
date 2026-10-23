@@ -1,5 +1,6 @@
 # Publish the replay producer image to Amazon ECR on every merge to main (SECOM-16).
 # Signs in with the keyless OIDC apply role, which only main can assume.
+# On failure, sends one alert to the secom-alerts SNS topic (SECOM-20).
 name: publish
 
 on:
@@ -10,6 +11,11 @@ on:
       - "producer/**"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "Also send a test alert to the secom-alerts topic"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,6 +28,7 @@ concurrency:
 env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: secom-producer
+  ALERTS_TOPIC_ARN: ${{ vars.ALERTS_TOPIC_ARN }}
 
 jobs:
   producer-image:
@@ -31,10 +38,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Sign in to AWS with OIDC (apply role, main only)
+        id: aws
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Send a test alert
+        if: inputs.test_alert
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          aws sns publish --topic-arn "$ALERTS_TOPIC_ARN" \
+            --subject "[SECOM] TEST alert from the publish workflow" \
+            --message "$(printf 'This is a test alert, sent on purpose (SECOM-20).\n\nRepo: %s\nCommit: %s\nRun: %s\n' \
+              "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$RUN_URL")"
 
       - name: Log in to Amazon ECR
         id: ecr
@@ -54,6 +72,7 @@ jobs:
           echo "IMAGE=${{ steps.ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}" >> "$GITHUB_ENV"
 
       - name: Build and push, tagged with the commit SHA
+        id: build
         if: steps.existing.outputs.found == 'false'
         env:
           IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
@@ -67,6 +86,7 @@ jobs:
           docker push "$IMAGE"
 
       - name: Wait for the vulnerability scan and report it
+        id: scan
         run: |
           # The scan starts a few seconds after the push, so poll for up to 5 minutes.
           for attempt in $(seq 1 30); do
@@ -88,6 +108,7 @@ jobs:
           findings=$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" \
             --image-id imageTag="${{ github.sha }}" \
             --query 'imageScanFindings.findingSeverityCounts' --output json)
+          echo "counts=$(echo "$findings" | tr -d ' \n')" >> "$GITHUB_OUTPUT"
           {
             echo "### Producer image published"
             echo ""
@@ -102,3 +123,26 @@ jobs:
             echo "::error::Critical vulnerabilities found in the producer image"
             exit 1
           fi
+
+      # One alert per failed run. It needs the AWS sign-in, so if that step itself failed,
+      # GitHub's own failed-run email is the only notice.
+      - name: Alert on failure
+        if: failure() && steps.aws.outcome == 'success' && env.ALERTS_TOPIC_ARN != ''
+        env:
+          OUT_ECR: ${{ steps.ecr.outcome }}
+          OUT_EXISTING: ${{ steps.existing.outcome }}
+          OUT_BUILD: ${{ steps.build.outcome }}
+          OUT_SCAN: ${{ steps.scan.outcome }}
+          SCAN_COUNTS: ${{ steps.scan.outputs.counts }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          failed="unknown"
+          for pair in "Log in to Amazon ECR:$OUT_ECR" "Check for existing image:$OUT_EXISTING" \
+                      "Build and push:$OUT_BUILD" "Vulnerability scan:$OUT_SCAN"; do
+            if [ "${pair##*:}" = "failure" ]; then failed="${pair%:*}"; break; fi
+          done
+          aws sns publish --topic-arn "$ALERTS_TOPIC_ARN" \
+            --subject "[SECOM] publish FAILED at: $failed" \
+            --message "$(printf 'The producer image publish workflow failed.\n\nFailing step: %s\nScan counts: %s\nRepo: %s\nCommit: %s\nTriggered by: %s (%s)\nRun: %s\n' \
+              "$failed" "${SCAN_COUNTS:-not reached}" "$GITHUB_REPOSITORY" "$GITHUB_SHA" \
+              "$GITHUB_ACTOR" "$GITHUB_EVENT_NAME" "$RUN_URL")"
