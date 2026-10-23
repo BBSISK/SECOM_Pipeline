@@ -18,9 +18,30 @@ A budget only alerts. It doesn't stop anything. Destroying the runtime stack aft
 | Stack | Contains | After a demo |
 |---|---|---|
 | Bootstrap | State bucket, GitHub OIDC provider and roles, AWS Budget, ECR repository (from SECOM-16) | **Kept.** IAM, OIDC and the budget cost nothing or close to it. The bucket holds a few KB of state. |
-| Runtime | Kinesis stream, Fargate producer, Lambda processor, RDS database, VPC (from Sprint 2) | **Destroyed.** These are the parts that bill by the hour. |
+| Runtime | VPC and network (SECOM-21, free), then Kinesis stream, Fargate producer, Lambda processor, RDS database | **Destroyed** with `runtime-down`, or automatically after 4 hours. The network is free; the services added later bill by the hour. |
 
-## Tear down after a demo
+## One-button demo mode (SECOM-22)
+
+Two GitHub Actions workflows run on `main` only, with the keyless OIDC apply role:
+
+| Workflow | How to run it | What it does |
+|---|---|---|
+| `runtime-up` | Actions → **runtime-up** → Run workflow | Plans the runtime stack, writes the plan into the run summary, then applies exactly that plan |
+| `runtime-down` | Actions → **runtime-down** → Run workflow | Plans the destroy, shows it, destroys, then lists any resource still tagged `Stack=runtime` |
+
+They share one concurrency lock, so an up and a down never run at the same time. Any failure emails the maintainer through the `secom-alerts` topic.
+
+**Safety net.** `runtime-down` also runs every hour. If the Terraform state shows the stack is up and the last successful `runtime-up` was more than **4 hours** ago (`MAX_UP_HOURS` in the workflow), it destroys the stack and emails the maintainer. It reads "up" from the state itself, so a stack applied from a laptop is caught too (with no `runtime-up` run to date it, it counts as overdue). When the stack is down, the hourly run does nothing.
+
+The tag check signs in with the read-only plan role, because the apply role has no access to the tag API. The tag index can lag a few minutes behind a delete, so a resource listed straight after a destroy is a warning to re-check, not proof something survived.
+
+### Up/down cycles
+
+| Date | Stack contents | Up for | Cost |
+|---|---|---|---|
+| _first cycle recorded after merge_ | | | |
+
+## Tear down by hand (if the workflows can't run)
 
 ```bash
 aws login --profile barry

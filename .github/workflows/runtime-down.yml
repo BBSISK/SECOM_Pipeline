@@ -1,0 +1,157 @@
+# Tear the runtime stack down (SECOM-22).
+# By hand: Actions -> runtime-down -> Run workflow (main only).
+# Safety net: also runs every hour. If the stack is up and the last successful runtime-up was more than
+# MAX_UP_HOURS ago (or there was none), it is destroyed and the maintainer is emailed via secom-alerts.
+# "Up" is read from the Terraform state itself, so a stack applied from a laptop is covered too.
+name: runtime-down
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 * * * *" # hourly, at an odd minute to avoid the top-of-hour rush
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC token for AWS (no stored keys)
+  actions: read # to read when runtime-up last succeeded
+
+concurrency:
+  group: runtime-stack
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+  TF_IN_AUTOMATION: "true"
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  ALERTS_TOPIC_ARN: ${{ vars.ALERTS_TOPIC_ARN }}
+  MAX_UP_HOURS: "4"
+
+jobs:
+  down:
+    name: runtime-down
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/runtime
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "~1.13.0"
+          terraform_wrapper: false
+
+      - name: Sign in to AWS with OIDC (apply role, main only)
+        id: aws
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init (remote state)
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Decide whether to tear down
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          managed=$(terraform state list | grep -v '^data\.' || true)
+          if [ -z "$managed" ]; then
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Runtime stack is already down; nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          count=$(echo "$managed" | wc -l | tr -d ' ')
+          if [ "$EVENT" != "schedule" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "Manual teardown of $count resources." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          last_up=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow runtime-up.yml --status success \
+            --limit 1 --json createdAt --jq '.[0].createdAt // empty')
+          if [ -z "$last_up" ]; then
+            hours=999
+          else
+            hours=$(( ( $(date -u +%s) - $(date -u -d "$last_up" +%s) ) / 3600 ))
+          fi
+          echo "hours=$hours" >> "$GITHUB_OUTPUT"
+          if [ "$hours" -ge "$MAX_UP_HOURS" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "Safety net: $count resources up for ${hours}h (limit ${MAX_UP_HOURS}h). Tearing down." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Stack up for ${hours}h, under the ${MAX_UP_HOURS}h limit. Leaving it." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Plan the destroy (shown in the run summary)
+        if: steps.decide.outputs.go == 'true'
+        run: |
+          terraform plan -destroy -input=false -lock-timeout=60s -no-color -out=down.tfplan | tee plan.txt
+          {
+            echo "### runtime-down: destroy plan"
+            echo '```'
+            grep -E '^  # |^Plan:|^No changes' plan.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Destroy
+        if: steps.decide.outputs.go == 'true'
+        run: |
+          terraform apply -input=false -lock-timeout=60s -no-color down.tfplan | tail -n 15
+          echo "### runtime-down: destroyed at $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tell the maintainer about an automatic teardown
+        if: steps.decide.outputs.go == 'true' && github.event_name == 'schedule' && env.ALERTS_TOPIC_ARN != ''
+        env:
+          HOURS: ${{ steps.decide.outputs.hours }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          aws sns publish --topic-arn "$ALERTS_TOPIC_ARN" \
+            --subject "[SECOM] runtime stack torn down automatically" \
+            --message "$(printf 'The runtime stack had been up for %s hours (limit %s), so the hourly safety net destroyed it.\n\nRun: %s\n' "$HOURS" "$MAX_UP_HOURS" "$RUN_URL")"
+
+      - name: Alert on failure
+        if: failure() && steps.aws.outcome == 'success' && env.ALERTS_TOPIC_ARN != ''
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          aws sns publish --topic-arn "$ALERTS_TOPIC_ARN" \
+            --subject "[SECOM] runtime-down FAILED: stack may still be up and billing" \
+            --message "$(printf 'runtime-down failed. Runtime resources may still exist and cost money.\n\nRun: %s\n\nCheck the run, then re-run it or follow docs/teardown.md by hand.\n' "$RUN_URL")"
+
+      # The apply role can't use the tag API, so this check signs in again with the read-only plan role.
+      # Last on purpose: the alert steps above need the apply role.
+      - name: Sign in to AWS with OIDC (read-only plan role)
+        if: steps.decide.outputs.go == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: List any runtime resources still tagged
+        if: steps.decide.outputs.go == 'true'
+        continue-on-error: true
+        run: |
+          left=$(aws resourcegroupstaggingapi get-resources \
+            --tag-filters Key=Project,Values=secom-pipeline Key=Stack,Values=runtime \
+            --query 'ResourceTagMappingList[].ResourceARN' --output text)
+          {
+            echo "### Runtime-tagged resources still listed"
+            if [ -z "$left" ] || [ "$left" = "None" ]; then
+              echo "None."
+            else
+              echo "The tag index can lag a few minutes behind a delete; re-check later if this persists:"
+              echo '```'
+              echo "$left" | tr '\t' '\n'
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$left" ] && [ "$left" != "None" ]; then echo "::warning::Runtime-tagged resources still listed after destroy"; fi
