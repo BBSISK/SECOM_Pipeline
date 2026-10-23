@@ -93,6 +93,7 @@ flowchart TB
 | AWS Budgets | $20 monthly cost budget with email alerts at 50%, 80%, 100% and on forecast | Bootstrap | Built |
 | Amazon SNS | `secom-alerts` topic: emails the maintainer when the publish workflow fails; CI may only publish to it | Bootstrap | Built (Sprint 2) |
 | Amazon ECR | Private registry for the producer image: immutable commit-SHA tags, vulnerability scan on push, lifecycle policy | Bootstrap | Built |
+| VPC (runtime network) | Two public subnets, internet gateway, free S3 gateway endpoint, no NAT; producer security group: no inbound, HTTPS out only | Runtime | Built (Sprint 2) |
 | Kinesis Data Streams | The live stream: one shard keeps records in order and holds 24 hours for replay | Runtime | Planned (Sprint 2) |
 | ECS Fargate | Runs the replay producer container, no servers to manage | Runtime | Planned (Sprint 2) |
 | Lambda | Processor: validates records, writes raw and clean data, computes signals; later the read-only MCP server | Runtime | Planned (Sprint 2) |

@@ -85,6 +85,7 @@ Every accepted finding is listed in [`.trivyignore.yaml`](../.trivyignore.yaml) 
 |---|---|---|
 | AWS-0132: no customer-managed KMS key | Terraform state bucket | A KMS key costs $1 a month plus request charges against a $20 monthly budget. The bucket is already private, versioned, TLS-only and readable only by the maintainer and the two CI roles |
 | AWS-0136: SNS topic not on a customer-managed KMS key | `secom-alerts` topic | Same $1-a-month reason. Encrypted with the AWS-managed key, and messages carry only build metadata (step, commit, scan counts, run link). Known limit: CloudWatch alarms can't publish to it; revisit before SECOM-23 / SECOM-27 |
+| AWS-0104: security group allows outbound to 0.0.0.0/0 | Producer security group (runtime) | HTTPS (443) only, nothing inbound. With no NAT gateway and no paid interface endpoints, the task must reach Kinesis, ECR and CloudWatch Logs on their public AWS endpoints, which have no fixed address range. S3 uses the free gateway endpoint |
 
 LOW findings are reported but don't fail the build. Current ones: ECR and S3 encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
 

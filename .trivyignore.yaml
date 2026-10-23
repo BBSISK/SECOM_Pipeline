@@ -16,3 +16,11 @@ misconfigurations:
       customer-managed KMS key. Deliberate: $0 versus $1/month for a CMK on a demo-mode budget, and the
       messages carry only build metadata (step, commit, scan counts, run link), no data. Known limit:
       CloudWatch alarms can't publish to this topic; revisit before SECOM-23 / SECOM-27.
+  - id: AWS-0104
+    paths:
+      - "infra/runtime/network.tf"
+    statement: >-
+      Producer security group allows outbound HTTPS (443 only) to 0.0.0.0/0. Deliberate: with no NAT
+      gateway and no paid interface endpoints, the task reaches Kinesis, ECR and CloudWatch Logs on
+      their public AWS endpoints, which have no fixed address range to list. Inbound is closed, other
+      ports are closed, and S3 goes through the free gateway endpoint. See docs/costs.md.
