@@ -8,3 +8,11 @@ misconfigurations:
       Terraform state bucket uses SSE-S3 (AES-256) rather than a customer-managed KMS key. Deliberate:
       a CMK costs $1/month plus requests against a $20/month budget, and the bucket is already private,
       versioned, TLS-only and readable only by the maintainer and the two CI roles. See docs/costs.md.
+  - id: AWS-0136
+    paths:
+      - "infra/bootstrap/alerts.tf"
+    statement: >-
+      SNS alert topic (SECOM-20) is encrypted with the AWS-managed key alias/aws/sns rather than a
+      customer-managed KMS key. Deliberate: $0 versus $1/month for a CMK on a demo-mode budget, and the
+      messages carry only build metadata (step, commit, scan counts, run link), no data. Known limit:
+      CloudWatch alarms can't publish to this topic; revisit before SECOM-23 / SECOM-27.

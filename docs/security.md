@@ -84,8 +84,9 @@ Every accepted finding is listed in [`.trivyignore.yaml`](../.trivyignore.yaml) 
 | Finding | Where | Why it is accepted |
 |---|---|---|
 | AWS-0132: no customer-managed KMS key | Terraform state bucket | A KMS key costs $1 a month plus request charges against a $20 monthly budget. The bucket is already private, versioned, TLS-only and readable only by the maintainer and the two CI roles |
+| AWS-0136: SNS topic not on a customer-managed KMS key | `secom-alerts` topic | Same $1-a-month reason. Encrypted with the AWS-managed key, and messages carry only build metadata (step, commit, scan counts, run link). Known limit: CloudWatch alarms can't publish to it; revisit before SECOM-23 / SECOM-27 |
 
-LOW findings are reported but don't fail the build. Current ones: ECR, S3 and the SNS alert topic encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
+LOW findings are reported but don't fail the build. Current ones: ECR and S3 encrypted with AWS-managed rather than customer-managed keys (same reason as above), no S3 access logging on the state bucket, and no `HEALTHCHECK` in the producer Dockerfile (ECS runs it as a task with no port to probe).
 
 ### Supply chain
 
