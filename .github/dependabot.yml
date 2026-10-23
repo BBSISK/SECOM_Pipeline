@@ -22,9 +22,14 @@ updates:
       actions:
         patterns: ["*"]
 
-  # The producer's base image (python:3.12-slim on Amazon ECR Public).
+  # The producer's base image (official python:3.12-slim, pulled via mirror.gcr.io).
+  # Stay on Python 3.12, the version CI tests against: take patch updates and rebuilt images only.
+  # Moving to a new Python release is a deliberate story, not an automatic bump.
   - package-ecosystem: docker
     directory: "/producer"
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: "library/python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

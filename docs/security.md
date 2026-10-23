@@ -82,6 +82,7 @@ LOW findings are reported but don't fail the build. Current ones: ECR and S3 enc
 
 - **Third-party GitHub Actions are pinned to a commit SHA**, not a tag, with the version in a comment. A tag can be moved to point at different code; a commit SHA cannot. Dependabot proposes SHA updates.
 - **Trivy and Hadolint are downloaded as release binaries and checked against a SHA-256 written in `ci.yml`.** If the download doesn't match, the job stops before running it. This is a direct response to the March 2026 compromise of Trivy's own release process and GitHub Actions ([GHSA-69fq-xp46-6x23](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23), CVE-2026-33634), where moved tags and a tampered release ran attacker code in other projects' CI. Dependabot can't update these two, so their version and checksum are bumped together by hand.
+- **The base image is the official Docker Hub `python:3.12-slim`, pulled through Google's mirror (`mirror.gcr.io`).** It was first pulled from Amazon ECR Public, but ECR Public rate-limits anonymous pulls per IP and shared GitHub runners kept hitting `429 Data limit exceeded`, which failed the required `producer-image` check. The mirror serves the same official image without a login. The Trivy image scan still checks whatever is pulled, on every pull request.
 
 ### Proving the gate blocks
 
