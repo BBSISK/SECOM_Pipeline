@@ -10,6 +10,8 @@ Region: eu-west-1. Prices come from the AWS Price List API via `scripts/price_ch
 | IAM, GitHub OIDC provider | Bootstrap | Free | None |
 | AWS Budgets | Bootstrap | Free for the first budgets in an account, then a small daily fee per budget | Check how many budgets the account already has |
 | ECR | Bootstrap | Per GB-month of images stored | Small: a lifecycle policy keeps only recent images |
+| VPC, 2 subnets, internet gateway, route table, security groups | Runtime | Free | None. Deliberately no NAT gateway |
+| S3 gateway endpoint | Runtime | Free (gateway endpoints have no hourly or data charge) | None |
 | Kinesis Data Streams (1 provisioned shard) | Runtime | Per shard-hour, plus PUT payload units | Only while the runtime stack exists |
 | ECS Fargate (producer, 0.25 vCPU / 0.5 GB) | Runtime | Per vCPU-hour and GB-hour while the task runs | Only while running |
 | Public IPv4 address (producer task) | Runtime | Per hour while the address is in use | Only while the producer runs. Cheaper than a NAT gateway |

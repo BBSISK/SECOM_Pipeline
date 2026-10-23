@@ -2,7 +2,7 @@
 # Lambda, RDS). It is created for a demo with `terraform apply` and removed
 # afterwards with `terraform destroy` (see docs/teardown.md, added in SECOM-12).
 #
-# Empty for now. It exists in Sprint 1 to prove the remote state and locking work.
+# Sprint 2 adds the network first (network.tf, SECOM-21): free resources only.
 
 variable "region" {
   description = "AWS region for every resource in this project."
