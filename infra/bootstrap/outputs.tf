@@ -27,3 +27,8 @@ output "producer_repository_url" {
   description = "ECR repository for the replay producer image."
   value       = aws_ecr_repository.producer.repository_url
 }
+
+output "alerts_topic_arn" {
+  description = "Set as GitHub repository variable ALERTS_TOPIC_ARN (an identifier, not a secret)."
+  value       = aws_sns_topic.alerts.arn
+}

@@ -162,6 +162,14 @@ data "aws_iam_policy_document" "apply_permissions" {
     resources = ["${aws_s3_bucket.tfstate.arn}/bootstrap/*"]
   }
 
+  # Send to the alert topic (SECOM-20). Publish only: it can't subscribe, unsubscribe
+  # or change the topic, so CI can't redirect or silence alerts.
+  statement {
+    sid       = "PublishAlertsOnly"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alerts.arn]
+  }
+
   # The services the pipeline is built from. Scoped by service; tightened per
   # resource as each one is added in later sprints.
   statement {
