@@ -4,6 +4,8 @@ ruff>=0.17.1,<1
 pandas>=3.0.6,<4
 matplotlib>=3.11.2,<4
 jsonschema>=4.26.0,<5
+# SPC analysis (SECOM-30): fits each sensor's Yeo-Johnson lambda. The transform itself is plain NumPy.
+scipy>=1.14,<2
 # Not used directly: matplotlib depends on it. Set a floor because pip-audit (SECOM-19) found known
 # vulnerabilities in the 12.x releases that matplotlib would otherwise install.
 pillow>=13.0.0
