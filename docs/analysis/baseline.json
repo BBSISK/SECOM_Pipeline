@@ -1,0 +1,109 @@
+{
+  "story": "SECOM-29",
+  "baseline_start": "2008-08-25",
+  "baseline_end_exclusive": "2008-09-29",
+  "phase2_start": "2008-09-29",
+  "runs_used": "all runs in the window (passes and fails)",
+  "baseline_runs": 717,
+  "baseline_fails": 22,
+  "phase2_runs": 401,
+  "phase2_fails": 24,
+  "monitorable_sensors": 446,
+  "flat_within_baseline": [
+    "s074",
+    "s206",
+    "s209",
+    "s342",
+    "s347",
+    "s478"
+  ],
+  "outlier_dominated_sensors": [
+    "s337",
+    "s200",
+    "s475",
+    "s203",
+    "s202",
+    "s338",
+    "s471",
+    "s067",
+    "s339",
+    "s198",
+    "s334",
+    "s340",
+    "s196",
+    "s204",
+    "s437",
+    "s470",
+    "s199",
+    "s197",
+    "s166",
+    "s469",
+    "s479",
+    "s333",
+    "s201",
+    "s068",
+    "s477"
+  ],
+  "extreme_runs": [
+    {
+      "run": 634,
+      "timestamp": "2008-09-01 19:54:00",
+      "fail": true,
+      "sensors_beyond_10_robust_sd": 45
+    },
+    {
+      "run": 457,
+      "timestamp": "2008-08-27 22:58:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 39
+    },
+    {
+      "run": 466,
+      "timestamp": "2008-08-28 05:00:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 36
+    },
+    {
+      "run": 1123,
+      "timestamp": "2008-09-27 11:45:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 23
+    },
+    {
+      "run": 497,
+      "timestamp": "2008-08-28 21:52:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 20
+    },
+    {
+      "run": 800,
+      "timestamp": "2008-09-12 06:38:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 20
+    },
+    {
+      "run": 709,
+      "timestamp": "2008-09-03 01:15:00",
+      "fail": true,
+      "sensors_beyond_10_robust_sd": 20
+    },
+    {
+      "run": 539,
+      "timestamp": "2008-08-29 15:01:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 17
+    },
+    {
+      "run": 956,
+      "timestamp": "2008-09-20 15:19:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 17
+    },
+    {
+      "run": 856,
+      "timestamp": "2008-09-15 22:54:00",
+      "fail": false,
+      "sensors_beyond_10_robust_sd": 16
+    }
+  ]
+}
