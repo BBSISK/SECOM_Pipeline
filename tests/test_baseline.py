@@ -22,7 +22,9 @@ def labels_at(times, results):
 
 
 def test_assign_period_boundaries():
-    ts = pd.Series(pd.to_datetime(["2008-08-24 23:59", "2008-08-25 00:00", "2008-09-28 23:59", "2008-09-29 00:00"]))
+    ts = pd.Series(
+        pd.to_datetime(["2008-08-24 23:59", "2008-08-25 00:00", "2008-09-28 23:59", "2008-09-29 00:00"])
+    )
     assert list(assign_period(ts)) == [RAMP_UP, BASELINE, BASELINE, PHASE2]
 
 
@@ -37,19 +39,33 @@ def test_period_summaries_counts_runs_and_fails():
 
 def test_weekly_stability_flags_a_shifted_week_and_skips_flat_sensors():
     # Two weeks, 4 runs each. s1 sits at 0 in week one and 10 in week two; s2 never changes.
-    times = ["2008-09-01", "2008-09-02", "2008-09-03", "2008-09-04", "2008-09-08", "2008-09-09", "2008-09-10", "2008-09-11"]
+    times = [
+        "2008-09-01",
+        "2008-09-02",
+        "2008-09-03",
+        "2008-09-04",
+        "2008-09-08",
+        "2008-09-09",
+        "2008-09-10",
+        "2008-09-11",
+    ]
     labels = labels_at(times, [-1, -1, -1, 1, -1, -1, -1, -1])
     sensors = pd.DataFrame({"s1": [0, 0, 0, 0, 10, 10, 10, 10], "s2": [5.0] * 8})
     sensors.loc[1, "s1"] = np.nan  # one missing value in week one
     out = weekly_stability(sensors, labels)
     assert list(out["runs"]) == [4, 4]
     assert list(out["fails"]) == [1, 0]
-    assert list(out["share_shifted"]) == [1.0, 1.0]  # only s1 counts; it is far from its overall mean both weeks
+    assert list(out["share_shifted"]) == [
+        1.0,
+        1.0,
+    ]  # only s1 counts; it is far from its overall mean both weeks
     assert out["missing_pct"].iloc[0] == 1 / 8 * 100  # 1 of 8 cells (2 sensors x 4 runs)
 
 
 def test_half_split_shift_is_zero_for_a_steady_sensor_and_large_for_a_step():
-    sensors = pd.DataFrame({"steady": [1, 2, 1, 2, 1, 2, 1, 2], "step": [0, 0, 0, 0, 5, 5, 5, 5], "flat": [3] * 8})
+    sensors = pd.DataFrame(
+        {"steady": [1, 2, 1, 2, 1, 2, 1, 2], "step": [0, 0, 0, 0, 5, 5, 5, 5], "flat": [3] * 8}
+    )
     out = half_split_shift(sensors)
     assert out["steady"] == 0
     assert out["step"] > 1.5

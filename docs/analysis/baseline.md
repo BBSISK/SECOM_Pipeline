@@ -33,8 +33,9 @@ between 2 and 6 Oct.
 ![How many sensors sit away from their usual level](baseline/sensor-shift.png)
 
 **Sensor behaviour.** For each sensor and week, the shift is how far that week's mean sits from the
-sensor's whole-period mean, in standard deviations. In the first weeks, 15-29% of sensors sit more than 0.5 SD away:
-the process is still settling. From 18 Aug it is 4-8% and flat through the baseline. So the sensors settle about a week before
+sensor's whole-period mean, in standard deviations. In the first weeks, 15-29% of sensors sit more than
+0.5 SD away: the process is still settling. From 18 Aug it is 4-8% and flat through the baseline. So the
+sensors settle about a week before
 the fail rate does; starting at 25 Aug waits for both.
 
 ![Missing values by week](baseline/missing.png)
@@ -44,7 +45,8 @@ the fail rate does; starting at 25 Aug waits for both.
 
 ![Sample sensors over time](baseline/sample-sensors.png)
 
-Two outlier-dominated sensors (`s337`, `s200`) and two typical ones (`s022`, `s557`,
+Two outlier-dominated sensors (`s337`, `s200`) and two typical ones
+(`s022`, `s557`,
 picked at random with a fixed seed), as 50-run rolling mean and rolling SD in whole-period SD units. The
 square steps in the rolling SD are single extreme runs entering and leaving the 50-run window; `s337`
 and `s200` step together because the same runs are extreme in both. `s022` drifts about
@@ -72,12 +74,14 @@ and `s200` step together because the same runs are extreme in both. `s022` drift
 ## How stable is the baseline itself?
 
 - **Slow drift inside the window.** Comparing the first and second halves of the baseline, the median
-  sensor moves 0.15 SD, and 11% of sensors move more than 0.5 SD.
+  sensor moves 0.15 SD, and 11% of sensors move more
+  than 0.5 SD.
   A perfectly steady process would give about 0.05 SD by chance. So the "stable" period still
   drifts a little. I-MR limits come from run-to-run variation, so drifting sensors will signal more
   often; SECOM-30 and SECOM-31 have to allow for it.
 - **Runs are close to independent.** The median lag-1 autocorrelation across sensors is
-  0.04, and only 7% of sensors are above 0.3, so individuals (I-MR)
+  0.04, and only 7% of sensors are above 0.3, so
+  individuals (I-MR)
   charts are a reasonable choice.
 
 ## All runs, or passing runs only?
@@ -94,7 +98,8 @@ For most sensors it makes no difference: dropping the 22 fails changes the media
 spread by a factor of 1.002. For
 25 sensors it cuts the spread by more than 10%. On a closer look that is **not** because those
 sensors are noisy on failing runs in general: in each of them one run sits 11-22 SD from the mean, and in
-14 of the 25 that single run is a fail. Remove it and the spread drops by the
+14 of the 25 that single run is a fail. Remove it and the spread
+drops by the
 same amount whatever its label.
 
 | Sensor | Spread with passes only / all runs | Most extreme run | That run |
@@ -144,7 +149,8 @@ The outliers are **whole-run events**, not single sensors misbehaving. Measured 
 | 956 | 20 Sep 15:19 | pass | 17 |
 | 856 | 15 Sep 22:54 | pass | 16 |
 
-And the tails are heavy everywhere: 313 of the 717 baseline runs have five or more sensors beyond
+And the tails are heavy everywhere: 313 of the 717 baseline runs have five or more
+sensors beyond
 6 robust SDs. SECOM sensors are far from normal, so textbook three-sigma limits will flag far more than
 0.27% of runs.
 
@@ -154,10 +160,12 @@ What this means for the next stories:
   above, recompute) and decide how to set limits for heavy-tailed sensors, for example from the moving
   range (which one outlier inflates less than the SD) or from empirical percentiles.
 - **SECOM-32 (do signals warn before a fail?)** has an early hint to test properly: in the baseline,
-  64% of failing runs have five or more extreme sensors, against 43% of passing runs.
+  64% of failing runs have five or more extreme sensors, against
+  43% of passing runs.
   Not a conclusion yet: the baseline has only 22 fails.
 
 ## Phase II
 
-The 401 runs from 29 Sep onwards (24 fails, 6.0%) are held out. They are
+The 401 runs from 29 Sep onwards (24 fails, 6.0%) are
+held out. They are
 used only to test the limits, in time order (SECOM-31), with no peeking while the limits are set.

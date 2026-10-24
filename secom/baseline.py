@@ -61,7 +61,9 @@ def period_summaries(labels: pd.DataFrame, period: pd.Series) -> list[PeriodSumm
     return out
 
 
-def weekly_stability(sensors: pd.DataFrame, labels: pd.DataFrame, shift_threshold: float = 0.5) -> pd.DataFrame:
+def weekly_stability(
+    sensors: pd.DataFrame, labels: pd.DataFrame, shift_threshold: float = 0.5
+) -> pd.DataFrame:
     """Per week (Monday start): runs, fail rate, how far sensors sit from their norm, and missingness.
 
     A sensor's shift in a week is |weekly mean - whole-period mean| / whole-period SD.
@@ -128,6 +130,9 @@ def robust_z(sensors: pd.DataFrame) -> pd.DataFrame:
 
 
 def extreme_runs(sensors: pd.DataFrame, threshold: float = 10.0, min_sensors: int = 5) -> pd.Series:
-    """Runs where at least `min_sensors` sensors sit beyond `threshold` robust SDs, with the count, most first."""
+    """Runs where at least `min_sensors` sensors sit beyond `threshold` robust SDs.
+
+    Returns the count of such sensors per run, most first.
+    """
     count = (robust_z(sensors) > threshold).sum(axis=1)
     return count[count >= min_sensors].sort_values(ascending=False)
