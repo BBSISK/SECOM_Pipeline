@@ -1,6 +1,6 @@
 # Tools for linting, testing and data profiling. CI installs exactly this file.
 pytest>=9.1.1,<10
-ruff>=0.17.1,<1
+ruff>=0.17.2,<1
 pandas>=3.0.6,<4
 matplotlib>=3.11.2,<4
 jsonschema>=4.26.0,<5
